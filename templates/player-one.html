@@ -1,0 +1,24 @@
+{% extends 'base.html' %} {% block body %}
+
+<div class="card-container">
+  <div class="card">
+    <div>
+      <image
+        src="/static/uploads/{{ player.imageFile }}"
+        width="200"
+        height="200"
+      />
+    </div>
+    <div>{{ player.name }}</div>
+    <div>Age: {{ player.age }}</div>
+    <div>Height: {{ player.height }}</div>
+    <div>Weight: {{ player.weight }}</div>
+    <div>Position: {{ player.position }}</div>
+    <div>Nationality: {{ player.nationality }}</div>
+    <div>Match Played: {{ player.match_played }}</div>
+    <div>Goals: {{ player.goals }}</div>
+    <div>Assists: {{ player.assists }}</div>
+  </div>
+</div>
+
+{% endblock %}

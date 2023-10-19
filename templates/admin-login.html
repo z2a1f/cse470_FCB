@@ -1,0 +1,25 @@
+{% extends 'base-admin.html' %} {% block body %}
+<div class="form-container">
+  <form action="/admin/login" method="POST">
+    <h1>Username</h1>
+    <input
+      type="username"
+      class="form-control"
+      id="username"
+      placeholder="Enter username"
+      name="username"
+    />
+
+    <h1>Password:</h1>
+    <input
+      type="password"
+      class="form-control"
+      id="pwd"
+      placeholder="Enter password"
+      name="password"
+    />
+    <h1 style="color: red">{{ errorMsg }}</h1>
+    <button type="submit" class="btn btn-dark">Submit</button>
+  </form>
+</div>
+{% endblock %}
