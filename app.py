@@ -1,13 +1,15 @@
-from flask import Flask, render_template, request, redirect, session, send_file, url_for,flash
+from flask import Flask, render_template, request, redirect, session, send_file, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
 import bcrypt
 from datetime import datetime
-
+import pickle
+from bs4 import BeautifulSoup
+import requests
+import re
 from flask_share import Share
 from werkzeug.utils import secure_filename
 import os
-from functools import wraps
 UPLOAD_FOLDER = './static/uploads/'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 ADMINUSER = 'admin'
@@ -214,8 +216,114 @@ def playerOne(id):
 def team():
     return render_template("team.html")
 
+@app.route('/matches')
+def allMatches():
+    all_matches = Matches.query.order_by(Matches.created_at).all()
+    return render_template("matches.html", all_matches=all_matches)
 
 
+@app.route('/matches/<int:id>')
+def matchOne(id):
+    match = Matches.query.get_or_404(id)
+    return render_template("match-one.html", match=match)
+
+
+@app.route('/admin/matches', methods=['POST', 'GET'])
+@login_required
+def matchesAdd():
+    if request.method == "POST":
+        team1 = request.form['team1']
+        team2 = request.form['team2']
+        stadium = request.form['stadium']
+        time = request.form['time']
+        new_match = Matches(team1=team1, team2=team2,
+                            stadium=stadium, time=time)
+
+        try:
+            db.session.add(new_match)
+            db.session.commit()
+            return redirect('/admin/matches')
+        except:
+            return 'An error occurred'
+    else:
+        all_matches = Matches.query.order_by(Matches.created_at).all()
+        return render_template("match-add.html", all_matches=all_matches)
+
+
+@app.route('/admin/matches/scrape', methods=['GET'])
+def matchesScrape():
+    html_text = requests.get(
+        'https://www.fcbarcelona.com/en/football/first-team/schedule').text
+    soup = BeautifulSoup(html_text, 'lxml')
+    team1s = soup.find_all('div', class_=re.compile(
+        ("^fixture-info__name--home")))
+    team2s = soup.find_all('div', class_=re.compile(
+        ("^fixture-info__name--away")))
+    dates = soup.find_all('div', class_=re.compile(
+        ("^fixture-result-list__fixture-date")))
+    times = soup.find_all('div', class_=re.compile(("^fixture-info__time")))
+    stadiums = soup.find_all('div', class_=re.compile(
+        ("^fixture-result-list__stage-location")))
+
+    for team1, team2, date, time, stadium in zip(team1s, team2s, dates, times, stadiums):
+        new_match = Matches(team1=team1.text, team2=team2.text,
+                            stadium=stadium.text, time=date.text)
+        try:
+            db.session.add(new_match)
+            db.session.commit()
+        except:
+            return 'An error occurred'
+    return redirect('/admin/matches')
+
+
+@app.route('/admin/matches/delete/<int:id>')
+def matchDelete(id):
+    match_to_delete = Matches.query.get_or_404(id)
+    try:
+        db.session.delete(match_to_delete)
+        db.session.commit()
+        return redirect('/admin/matches')
+    except:
+        return 'An error occurred'
+
+
+@app.route('/admin/matches/deleteall')
+def matchDeleteAll():
+
+    try:
+        db.session.query(Matches).delete()
+        db.session.commit()
+        return redirect('/admin/matches')
+    except:
+        return 'An error occurred'
+
+
+@app.route('/admin/matches/update/<int:id>', methods=['POST', 'GET'])
+def matchUpdate(id):
+    match_to_update = Matches.query.get_or_404(id)
+    if request.method == "POST":
+        match_to_update.team1 = request.form['team1']
+        match_to_update.team2 = request.form['team2']
+        match_to_update.stadium = request.form['stadium']
+        match_to_update.time = request.form['time']
+        try:
+            db.session.commit()
+            return redirect('/admin/matches')
+        except:
+            return 'An error occurred'
+    else:
+        return render_template("match-update.html", match=match_to_update)
+
+class Matches(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team1 = db.Column(db.String(200), nullable=True)
+    team2 = db.Column(db.String(200), nullable=True)
+    stadium = db.Column(db.String(200), nullable=True)
+    time = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return '<Matches %r>' % self.id
 
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
