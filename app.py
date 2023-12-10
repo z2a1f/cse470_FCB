@@ -313,6 +313,110 @@ def matchUpdate(id):
             return 'An error occurred'
     else:
         return render_template("match-update.html", match=match_to_update)
+@app.route('/admin/news', methods=['POST', 'GET'])
+@login_required
+def newsAdd():
+    if request.method == "POST":
+        news_title = request.form['title']
+        news_article = request.form['article']
+        new_news = News(title=news_title, article=news_article)
+
+        try:
+            db.session.add(new_news)
+            db.session.commit()
+            return redirect('/admin/news')
+        except:
+            return 'An error occurred'
+    else:
+        all_news = News.query.order_by(News.created_at).all()
+        return render_template("news-add.html", all_news=all_news)
+
+
+@app.route('/admin/news/scrape', methods=['GET'])
+def newsScrape():
+    html_text = requests.get(
+        'https://onefootball.com/en/team/barcelona-5').text
+    soup = BeautifulSoup(html_text, 'lxml')
+    titles = soup.find_all('p', class_=re.compile(
+        ("^NewsTeaserV2_teaser__title")))
+    teasers = soup.find_all('p', class_=re.compile(
+        ("^NewsTeaserV2_teaser__preview")))
+    aS = soup.find_all('a', class_=re.compile(
+        ("^NewsTeaserV2_teaser__content")))
+    for title, url in zip(titles, aS):
+        titleText = title.text
+        news_html = requests.get('https://onefootball.com' + url['href']).text
+        news_soup = BeautifulSoup(news_html, 'lxml')
+        article_paragraphs = news_soup.find_all(
+            'div', class_=re.compile(("^ArticleParagraph")))
+        articleText = ''
+        for article in article_paragraphs:
+            if article.p:
+                articleText += article.p.text
+        new_news = News(title=titleText, article=articleText)
+        try:
+            db.session.add(new_news)
+            db.session.commit()
+        except:
+            return 'An error occurred'
+    return redirect('/admin/news')
+
+
+@app.route('/admin/news/delete/<int:id>')
+def newsDelete(id):
+    news_to_delete = News.query.get_or_404(id)
+    try:
+        db.session.delete(news_to_delete)
+        db.session.commit()
+        return redirect('/admin/news')
+    except:
+        return 'An error occurred'
+
+
+@app.route('/admin/news/deleteall')
+def newsDeleteAll():
+    try:
+        db.session.query(News).delete()
+        db.session.commit()
+        return redirect('/admin/news')
+    except:
+        return 'An error occurred'
+
+
+@app.route('/admin/news/update/<int:id>', methods=['POST', 'GET'])
+def newsUpdate(id):
+    news_to_update = News.query.get_or_404(id)
+    if request.method == "POST":
+        news_to_update.title = request.form['title']
+        news_to_update.article = request.form['article']
+        try:
+            db.session.commit()
+            return redirect('/admin/news')
+        except:
+            return 'An error occurred'
+    else:
+        return render_template("news-update.html", news=news_to_update)
+
+
+@app.route('/news')
+def allNews():
+    all_news = News.query.order_by(News.created_at).all()
+    return render_template("news.html", all_news=all_news)
+
+class News(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    article = db.Column(db.String(1000), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return '<News %r>' % self.id
+
+
+@app.route('/news/<int:id>')
+def newsOne(id):
+    news = News.query.get_or_404(id)
+    return render_template("news-one.html", news=news)
 
 class Matches(db.Model):
     id = db.Column(db.Integer, primary_key=True)
